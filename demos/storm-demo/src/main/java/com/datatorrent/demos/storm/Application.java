@@ -34,28 +34,12 @@ public class Application implements StreamingApplication
   @Override
   public void populateDAG(DAG dag, Configuration conf)
   {
-
-    SpoutWrapper input = new SpoutWrapper();
-    input.setName("sentence");
-    input.setSpout(new WordSpout());
-
-    BoltWrapper tokens = new BoltWrapper();
-    tokens.setName("tokens");
-    tokens.setBolt(new BoltTokenizer());
-
-    BoltWrapper counter = new BoltWrapper();
-    counter.setName("counter");
-    counter.setBolt(new BoltCounter());
-
-    BoltWrapper sink = new BoltWrapper();
-    sink.setName("output");
-    sink.setBolt(new BoltPrintSink(new TupleOutputFormatter()));
-
-    dag.addOperator("input", input);
-    dag.addOperator("tokenizer", tokens);
-    dag.addOperator("counter", counter);
-    dag.addOperator("sink", sink);
-    dag.setInputPortAttribute(counter.input, PortContext.STREAM_CODEC, new StormTupleStreamCodec(new int[]{0}));
+    SpoutWrapper input = dag.addOperator("input", new SpoutWrapper(new WordSpout(), "sentence"));
+    BoltWrapper tokens = dag.addOperator("tokenizer", new BoltWrapper(new BoltTokenizer(), "tokens"));
+    BoltWrapper counter = dag.addOperator("counter", new BoltWrapper(new BoltCounter(), "counter"));
+    BoltWrapper sink = dag.addOperator("sink",
+        new BoltWrapper(new BoltPrintSink(new TupleOutputFormatter()), "output"));
+    dag.setInputPortAttribute(counter.input, PortContext.STREAM_CODEC, new StormTupleStreamCodec(new int[] { 0 }));
     dag.addStream("input", input.output, tokens.input);
     dag.addStream("word-count", tokens.output, counter.input);
     dag.addStream("output", counter.output, sink.input);
