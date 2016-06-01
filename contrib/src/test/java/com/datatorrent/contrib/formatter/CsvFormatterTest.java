@@ -18,8 +18,6 @@
  */
 package com.datatorrent.contrib.formatter;
 
-import java.util.Date;
-
 import org.joda.time.DateTime;
 import org.junit.Assert;
 import org.junit.Rule;
@@ -27,13 +25,15 @@ import org.junit.Test;
 import org.junit.rules.TestWatcher;
 import org.junit.runner.Description;
 
-import com.datatorrent.contrib.formatter.CsvFormatter;
+import com.datatorrent.contrib.parser.CsvPOJOParserTest.Ad;
+import com.datatorrent.lib.appdata.schemas.SchemaUtils;
 import com.datatorrent.lib.testbench.CollectorTestSink;
 import com.datatorrent.lib.util.TestUtils;
 
 public class CsvFormatterTest
 {
 
+  private static final String filename = "schema.json";
   CsvFormatter operator;
   CollectorTestSink<Object> validDataSink;
   CollectorTestSink<String> invalidDataSink;
@@ -49,8 +49,8 @@ public class CsvFormatterTest
     {
       super.starting(description);
       operator = new CsvFormatter();
-      operator.setFieldInfo("name:string,dept:string,eid:integer,dateOfJoining:date");
-      operator.setLineDelimiter("\r\n");
+      operator.setClazz(Ad.class);
+      operator.setSchema(SchemaUtils.jarResourceFileToString(filename));
       validDataSink = new CollectorTestSink<Object>();
       invalidDataSink = new CollectorTestSink<String>();
       TestUtils.setSink(operator.out, validDataSink);
@@ -70,96 +70,42 @@ public class CsvFormatterTest
   public void testPojoReaderToCsv()
   {
     operator.setup(null);
-    EmployeeBean emp = new EmployeeBean();
-    emp.setName("john");
-    emp.setDept("cs");
-    emp.setEid(1);
-    emp.setDateOfJoining(new DateTime().withDate(2015, 1, 1).toDate());
-    operator.in.process(emp);
+    Ad ad = new Ad();
+    ad.setCampaignId(9823);
+    ad.setAdId(1234);
+    ad.setAdName("ad");
+    ad.setBidPrice(1.2);
+    ad.setStartDate(
+        new DateTime().withDate(2015, 1, 1).withHourOfDay(0).withMinuteOfHour(0).withSecondOfMinute(0).toDate());
+    ad.setEndDate(new DateTime().withDate(2016, 1, 1).toDate());
+    ad.setSecurityCode(12345678);
+    ad.setParentCampaign("CAMP_AD");
+    ad.setActive(true);
+    ad.setWeatherTargeted('y');
+    ad.setValid("valid");
+    operator.in.process(ad);
     Assert.assertEquals(1, validDataSink.collectedTuples.size());
     Assert.assertEquals(0, invalidDataSink.collectedTuples.size());
     String csvOp = (String)validDataSink.collectedTuples.get(0);
     Assert.assertNotNull(csvOp);
-    Assert.assertEquals("john,cs,1,01/01/2015" + operator.getLineDelimiter(), csvOp);
+    Assert.assertEquals("1234,9823,ad,1.2,2015-01-01 00:00:00,01/01/2016,12345678,true,false,CAMP_AD,y,valid\r\n",
+        csvOp);
+    Assert.assertEquals(1, operator.getIncomingTuplesCount());
+    Assert.assertEquals(0, operator.getErrorTupleCount());
+    Assert.assertEquals(1, operator.getEmittedObjectCount());
   }
 
   @Test
-  public void testPojoReaderToCsvMultipleDate()
+  public void testPojoReaderToCsvNullInput()
   {
-    operator.setFieldInfo("name:string,dept:string,eid:integer,dateOfJoining:date,dateOfBirth:date|dd-MMM-yyyy");
     operator.setup(null);
-    EmployeeBean emp = new EmployeeBean();
-    emp.setName("john");
-    emp.setDept("cs");
-    emp.setEid(1);
-    emp.setDateOfJoining(new DateTime().withDate(2015, 1, 1).toDate());
-    emp.setDateOfBirth(new DateTime().withDate(2015, 1, 1).toDate());
-    operator.in.process(emp);
-    Assert.assertEquals(1, validDataSink.collectedTuples.size());
-    Assert.assertEquals(0, invalidDataSink.collectedTuples.size());
-    String csvOp = (String)validDataSink.collectedTuples.get(0);
-    Assert.assertNotNull(csvOp);
-    Assert.assertEquals("john,cs,1,01/01/2015,01-Jan-2015" + operator.getLineDelimiter(), csvOp);
-  }
+    operator.in.process(null);
+    Assert.assertEquals(0, validDataSink.collectedTuples.size());
+    Assert.assertEquals(1, invalidDataSink.collectedTuples.size());
+    Assert.assertEquals(1, operator.getIncomingTuplesCount());
+    Assert.assertEquals(1, operator.getErrorTupleCount());
+    Assert.assertEquals(0, operator.getEmittedObjectCount());
 
-  public static class EmployeeBean
-  {
-
-    private String name;
-    private String dept;
-    private int eid;
-    private Date dateOfJoining;
-    private Date dateOfBirth;
-
-    public String getName()
-    {
-      return name;
-    }
-
-    public void setName(String name)
-    {
-      this.name = name;
-    }
-
-    public String getDept()
-    {
-      return dept;
-    }
-
-    public void setDept(String dept)
-    {
-      this.dept = dept;
-    }
-
-    public int getEid()
-    {
-      return eid;
-    }
-
-    public void setEid(int eid)
-    {
-      this.eid = eid;
-    }
-
-    public Date getDateOfJoining()
-    {
-      return dateOfJoining;
-    }
-
-    public void setDateOfJoining(Date dateOfJoining)
-    {
-      this.dateOfJoining = dateOfJoining;
-    }
-
-    public Date getDateOfBirth()
-    {
-      return dateOfBirth;
-    }
-
-    public void setDateOfBirth(Date dateOfBirth)
-    {
-      this.dateOfBirth = dateOfBirth;
-    }
   }
 
 }
